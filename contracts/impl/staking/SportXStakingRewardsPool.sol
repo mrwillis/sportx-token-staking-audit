@@ -3,11 +3,11 @@
 pragma solidity 0.7.5;
 pragma abicoder v2;
 
-import "../../interfaces/staking/IFeePool.sol";
+import "../../interfaces/staking/ISportXStakingRewardsPool.sol";
 import "../../interfaces/staking/IStaking.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-contract FeePool is IFeePool {
+contract SportXStakingRewardsPool is ISportXStakingRewardsPool {
     using SafeERC20 for IERC20;
 
     IStaking private staking;
@@ -22,11 +22,10 @@ contract FeePool is IFeePool {
         _;
     }
 
-    function withdrawFee(
+    function stakeBehalf(
         address user,
-        address baseToken,
         uint256 amount
     ) external override onlyStaking {
-        IERC20(baseToken).safeTransfer(user, amount);
+        staking.stakeBehalf(user, amount);
     }
 }

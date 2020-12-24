@@ -6,6 +6,7 @@ pragma abicoder v2;
 import "../../interfaces/staking/IStaking.sol";
 import "../../interfaces/staking/IFeePool.sol";
 import "../../interfaces/staking/ISportXVault.sol";
+import "../../interfaces/staking/ISportXStakingRewardsPool.sol";
 import "../../interfaces/permissions/IPermissions.sol";
 import "../../interfaces/staking/IStakingParameters.sol";
 import "../Initializable.sol";
@@ -38,6 +39,7 @@ contract Staking is IStaking, Initializable {
     ISportXVault private sportXVault;
     IStakingParameters private stakingParameters;
     IPermissions private permissions;
+    ISportXStakingRewardsPool private sportXStakingRewardsPool;
 
     mapping(address => uint256) private stakeNonces;
     mapping(address => uint256) private unstakeNonces;
@@ -101,21 +103,19 @@ contract Staking is IStaking, Initializable {
 
     /// @notice Initializes this contract with reference to other contracts
     ///         in the protocol.
-    function initialize(ISportXVault _sportXVault, IFeePool _feePool)
-        external
-        notInitialized
-        onlySuperAdmin(msg.sender)
-    {
+    function initialize(
+        ISportXVault _sportXVault,
+        IFeePool _feePool,
+        ISportXStakingRewardsPool _sportXStakingRewardsPool
+    ) external notInitialized onlySuperAdmin(msg.sender) {
         sportXVault = _sportXVault;
         feePool = _feePool;
+        sportXStakingRewardsPool = _sportXStakingRewardsPool;
         initialized = true;
     }
 
     function finalizeEpoch() external override {
-        require(
-            canFinalizeEpoch(),
-            "EPOCH_NOT_OVER"
-        );
+        require(canFinalizeEpoch(), "EPOCH_NOT_OVER");
 
         address[] memory poolTokens = stakingParameters.getPoolTokens();
 
@@ -123,10 +123,12 @@ contract Staking is IStaking, Initializable {
             address token = poolTokens[i];
             uint256 rewardMultiplier =
                 stakingParameters.getRewardMultipliers(token);
+            address rewardPool = getCorrectRewardsPoolAddress(token);
             previousEpochRewards[token] = IERC20(token)
-                .balanceOf(address(feePool))
+                .balanceOf(rewardPool)
                 .mul(rewardMultiplier)
                 .div(FRACTION_PRECISION);
+
             previousEpochClaimedRewards[token] = 0;
         }
 
@@ -157,14 +159,14 @@ contract Staking is IStaking, Initializable {
                 );
             previousEpochClaimedRewards[token] = previousEpochRewards[token];
             rewardsClaimed[epoch - 1][token][staker] = true;
-            feePool.withdrawFee(staker, token, adjustedReward);
+            payoutReward(staker, token, adjustedReward);
             emit RewardsClaimed(staker, token, adjustedReward, epoch - 1);
         } else {
             previousEpochClaimedRewards[token] =
                 previousEpochClaimedRewards[token] +
                 reward;
             rewardsClaimed[epoch - 1][token][staker] = true;
-            feePool.withdrawFee(staker, token, reward);
+            payoutReward(staker, token, reward);
             emit RewardsClaimed(staker, token, reward, epoch - 1);
         }
     }
@@ -404,18 +406,22 @@ contract Staking is IStaking, Initializable {
         return latestUnstakeTime[staker];
     }
 
-    function canFinalizeEpoch()
-        public
-        view
-        override
-        returns (bool)
-    {
-        return block.timestamp >
-                startEpochTime.add(stakingParameters.getEpochLength());
+    function canFinalizeEpoch() public view override returns (bool) {
+        return
+            block.timestamp >
+            startEpochTime.add(stakingParameters.getEpochLength());
     }
 
     function getStartEpochTime() public view override returns (uint256) {
         return startEpochTime;
+    }
+
+    function getCorrectRewardsPoolAddress(address token) private view returns (address) {
+        if (token == address(sportX)) {
+            return address(sportXStakingRewardsPool);
+        } else {
+            return address(feePool);
+        }
     }
 
     function _withdraw(address staker, uint256 amount) private {
@@ -446,5 +452,17 @@ contract Staking is IStaking, Initializable {
         totalStakedAmount = totalStakedAmount.add(amount);
         sportXVault.deposit(tokenSender, amount);
         emit Stake(staker, amount, tokenSender);
+    }
+
+    function payoutReward(
+        address staker,
+        address token,
+        uint256 reward
+    ) private {
+        if (token == address(sportX)) {
+            sportXStakingRewardsPool.stakeBehalf(staker, reward);
+        } else {
+            feePool.withdrawFee(staker, token, reward);
+        }
     }
 }
