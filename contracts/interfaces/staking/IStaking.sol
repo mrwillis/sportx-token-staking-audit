@@ -45,11 +45,23 @@ abstract contract IStaking {
         bytes32 s
     ) external virtual;
 
-    function getStakeNonces(address staker) public view virtual returns (uint256);
+    function getStakeNonces(address staker)
+        public
+        view
+        virtual
+        returns (uint256);
 
-    function getUnstakeNonces(address staker) public view virtual returns (uint256);
+    function getUnstakeNonces(address staker)
+        public
+        view
+        virtual
+        returns (uint256);
 
-    function getWithdrawNonces(address staker) public view virtual returns (uint256);
+    function getWithdrawNonces(address staker)
+        public
+        view
+        virtual
+        returns (uint256);
 
     function getPreviousEpochRewards(address token)
         public
@@ -65,7 +77,11 @@ abstract contract IStaking {
 
     function getEpoch() public view virtual returns (uint256);
 
-    function getStakedAmounts(address staker) public view virtual returns (uint256);
+    function getStakedAmounts(address staker)
+        public
+        view
+        virtual
+        returns (uint256);
 
     function getTotalStakedAmount() public view virtual returns (uint256);
 
@@ -87,11 +103,7 @@ abstract contract IStaking {
         virtual
         returns (uint256);
 
-    function canFinalizeEpoch()
-        public
-        view
-        virtual
-        returns (bool);
+    function canFinalizeEpoch() public view virtual returns (bool);
 
     function getStartEpochTime() public view virtual returns (uint256);
 }

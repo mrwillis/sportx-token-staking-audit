@@ -13,15 +13,15 @@ abstract contract IStakingParameters {
 
     function setWithdrawDelay(uint256 newWithdrawDelay) public virtual;
 
-    function getPoolTokens() public virtual view returns (address[] memory);
+    function getPoolTokens() public view virtual returns (address[] memory);
 
-    function getEpochLength() public virtual view returns (uint256);
+    function getEpochLength() public view virtual returns (uint256);
 
     function getRewardMultipliers(address token)
         public
-        virtual
         view
+        virtual
         returns (uint256);
 
-    function getWithdrawDelay() public virtual view returns (uint256);
+    function getWithdrawDelay() public view virtual returns (uint256);
 }

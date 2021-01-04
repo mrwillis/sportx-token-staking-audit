@@ -9,4 +9,6 @@ abstract contract IFeePool {
         address baseToken,
         uint256 amount
     ) external virtual;
+
+    function emergencyWithdraw(address token, uint256 amount) external virtual;
 }

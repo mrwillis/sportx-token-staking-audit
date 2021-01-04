@@ -6,7 +6,7 @@ There are 5 contracts to be audited. We intend to deploy these 5 contracts as an
 - Staking.sol
 - StakingParameters.sol
 - SportX.sol
-- SportX StakingRewardsPool.sol
+- SportXStakingRewardsPool.sol
 
 We inherit functionality from open-zeppelin's open source contracts (their latest version), and we leverage their RBAC contract called `AccessControl` significantly to provide permissioning. 
 
@@ -24,7 +24,11 @@ These contracts create a staking system for SportX token holders where they are 
 - ETH
 - other trusted trading tokens in the future. 
 
+It contains a emergency withdraw method only callable by the system administrators. 
+
 `SportXStakingRewardsPool` contains rewards denominated in SportX token distributed to stakers. It is essentially a pool for SportX tokens only. 
+
+It contains a emergency withdraw method only callable by the system administrators. 
 
 `StakingParameters` contains parameters regarding staking including
 
@@ -46,6 +50,6 @@ These are only configurable by those with the SYSTEM_PARAMETERS role.
     - If finalize epoch is called for epoch 0, it is possible to stake before the end of epoch 1 and still claim rewards for epoch 0. This is by design and a consequence of not snapshotting token balances. Presumably all token holders would have claimed their rewards by then.
     - A user who stakes after all rewards have been claimed will not be able to claim rewards for the past epoch. This function cannot claim rewards greater than the allocated amount computed in `finalizeEpoch`. 
     - To prevent people from staking, claiming rewards, then quickly unstaking, we set `withdrawDelay` (greater than `epochLength`) to a high number to lock up their tokens. 
-    - If the token is SportX, then it will auto-stake their rewards from the `SportXStakingRewards`, otherwise they will be claimed from `FeePool`
+    - If the token is SportX, then it will auto-stake their rewards from the `SportXStakingRewards`, otherwise they will be claimed from `FeePool`.
 
 
