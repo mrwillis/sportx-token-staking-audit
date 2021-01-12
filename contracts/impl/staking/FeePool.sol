@@ -47,6 +47,6 @@ contract FeePool is IFeePool {
         override
         onlyDefaultAdminRole
     {
-        IERC20(token).transfer(msg.sender, amount);
+        IERC20(token).safeTransfer(msg.sender, amount);
     }
 }

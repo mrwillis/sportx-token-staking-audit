@@ -17,7 +17,7 @@ abstract contract IStakingParameters {
 
     function getEpochLength() public view virtual returns (uint256);
 
-    function getRewardMultipliers(address token)
+    function getRewardMultiplier(address token)
         public
         view
         virtual

@@ -12,8 +12,9 @@ import "../../interfaces/staking/IStakingParameters.sol";
 import "../Initializable.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract Staking is IStaking, Initializable {
+contract Staking is IStaking, Initializable, ReentrancyGuard {
     using SafeMath for uint256;
 
     uint256 public constant FRACTION_PRECISION = 10**20;
@@ -55,13 +56,13 @@ contract Staking is IStaking, Initializable {
     mapping(address => uint256) private latestUnstakeTime;
     uint256 private startEpochTime;
 
-    event Stake(address staker, uint256 amount, address tokenSender);
-    event Unstake(address staker, uint256 amount);
-    event Withdraw(address staker, uint256 amount);
+    event Stake(address indexed staker, uint256 amount, address tokenSender);
+    event Unstake(address indexed staker, uint256 amount);
+    event Withdraw(address indexed staker, uint256 amount);
     event EpochFinalized(uint256 newEpochNumber);
     event RewardsClaimed(
-        address staker,
-        address token,
+        address indexed staker,
+        address indexed token,
         uint256 amount,
         uint256 epoch
     );
@@ -92,8 +93,7 @@ contract Staking is IStaking, Initializable {
     }
 
     /// @notice Throws if the caller is not a super admin.
-    /// @param operator The caller of the method.
-    modifier onlySuperAdmin(address operator) {
+    modifier onlySuperAdmin() {
         require(
             permissions.hasRole(permissions.DEFAULT_ADMIN_ROLE(), msg.sender),
             "NOT_DEFAULT_ADMIN_ROLE"
@@ -107,7 +107,7 @@ contract Staking is IStaking, Initializable {
         ISportXVault _sportXVault,
         IFeePool _feePool,
         ISportXStakingRewardsPool _sportXStakingRewardsPool
-    ) external notInitialized onlySuperAdmin(msg.sender) {
+    ) external notInitialized onlySuperAdmin {
         sportXVault = _sportXVault;
         feePool = _feePool;
         sportXStakingRewardsPool = _sportXStakingRewardsPool;
@@ -122,7 +122,7 @@ contract Staking is IStaking, Initializable {
         for (uint256 i = 0; i < poolTokens.length; i++) {
             address token = poolTokens[i];
             uint256 rewardMultiplier =
-                stakingParameters.getRewardMultipliers(token);
+                stakingParameters.getRewardMultiplier(token);
             address rewardPool = getCorrectRewardsPoolAddress(token);
             previousEpochRewards[token] = IERC20(token)
                 .balanceOf(rewardPool)
@@ -137,7 +137,12 @@ contract Staking is IStaking, Initializable {
         emit EpochFinalized(epoch);
     }
 
-    function claimRewards(address staker, address token) external override {
+    function claimRewards(address staker, address token)
+        external
+        override
+        nonReentrant
+    {
+        require(epoch > 0, "EPOCH_TOO_LOW");
         require(
             !rewardsClaimed[epoch - 1][token][staker],
             "REWARDS_ALREADY_CLAIMED"
@@ -146,7 +151,7 @@ contract Staking is IStaking, Initializable {
             previousEpochRewards[token].mul(stakedAmounts[staker]).div(
                 totalStakedAmount
             );
-        if (previousEpochClaimedRewards[token] == previousEpochRewards[token]) {
+        if (previousEpochClaimedRewards[token] >= previousEpochRewards[token]) {
             revert("ALL_REWARDS_CLAIMED");
         } else if (
             reward >
@@ -162,9 +167,10 @@ contract Staking is IStaking, Initializable {
             payoutReward(staker, token, adjustedReward);
             emit RewardsClaimed(staker, token, adjustedReward, epoch - 1);
         } else {
-            previousEpochClaimedRewards[token] =
-                previousEpochClaimedRewards[token] +
-                reward;
+            previousEpochClaimedRewards[token] = previousEpochClaimedRewards[
+                token
+            ]
+                .add(reward);
             rewardsClaimed[epoch - 1][token][staker] = true;
             payoutReward(staker, token, reward);
             emit RewardsClaimed(staker, token, reward, epoch - 1);
@@ -230,6 +236,11 @@ contract Staking is IStaking, Initializable {
         bytes32 r,
         bytes32 s
     ) external override {
+        require(staker != address(0), "INVALID_STAKER");
+        require(expiry == 0 || block.timestamp <= expiry, "META_STAKE_EXPIRED");
+        require(nonce == unstakeNonces[staker]++, "INVALID_NONCE");
+        require(amount <= stakedAmounts[staker], "INSUFFICIENT_STAKED_SPORTX");
+
         bytes32 digest =
             keccak256(
                 abi.encodePacked(
@@ -247,11 +258,7 @@ contract Staking is IStaking, Initializable {
                 )
             );
 
-        require(staker != address(0), "INVALID_STAKER");
         require(staker == ecrecover(digest, v, r, s), "INVALID_SIGNATURE");
-        require(expiry == 0 || block.timestamp <= expiry, "META_STAKE_EXPIRED");
-        require(nonce == unstakeNonces[staker]++, "INVALID_NONCE");
-        require(amount <= stakedAmounts[staker], "INSUFFICIENT_STAKED_SPORTX");
 
         _unstake(staker, amount);
     }
@@ -280,6 +287,24 @@ contract Staking is IStaking, Initializable {
         bytes32 r,
         bytes32 s
     ) external override {
+        require(staker != address(0), "INVALID_STAKER");
+        require(
+            expiry == 0 || block.timestamp <= expiry,
+            "META_WITHDRAW_EXPIRED"
+        );
+        require(nonce == withdrawNonces[staker]++, "INVALID_NONCE");
+        require(
+            amount <= pendingWithdrawAmounts[staker],
+            "INSUFFICIENT_UNSTAKED_SPORTX"
+        );
+        require(
+            block.timestamp >
+                latestUnstakeTime[staker].add(
+                    stakingParameters.getWithdrawDelay()
+                ),
+            "INSUFFICIENT_TIME_PASSED_SINCE_UNSTAKE"
+        );
+
         bytes32 digest =
             keccak256(
                 abi.encodePacked(
@@ -297,24 +322,8 @@ contract Staking is IStaking, Initializable {
                 )
             );
 
-        require(staker != address(0), "INVALID_STAKER");
         require(staker == ecrecover(digest, v, r, s), "INVALID_SIGNATURE");
-        require(
-            expiry == 0 || block.timestamp <= expiry,
-            "META_WITHDRAW_EXPIRED"
-        );
-        require(nonce == withdrawNonces[staker]++, "INVALID_NONCE");
-        require(
-            amount <= pendingWithdrawAmounts[staker],
-            "INSUFFICIENT_UNSTAKED_SPORTX"
-        );
-        require(
-            block.timestamp >
-                latestUnstakeTime[staker].add(
-                    stakingParameters.getWithdrawDelay()
-                ),
-            "INSUFFICIENT_TIME_PASSED_SINCE_UNSTAKE"
-        );
+
         _withdraw(staker, amount);
     }
 
@@ -416,7 +425,11 @@ contract Staking is IStaking, Initializable {
         return startEpochTime;
     }
 
-    function getCorrectRewardsPoolAddress(address token) private view returns (address) {
+    function getCorrectRewardsPoolAddress(address token)
+        private
+        view
+        returns (address)
+    {
         if (token == address(sportX)) {
             return address(sportXStakingRewardsPool);
         } else {

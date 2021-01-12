@@ -45,6 +45,13 @@ contract SportX is ERC20 {
         bytes32 r,
         bytes32 s
     ) external {
+        require(holder != address(0), "SportX/invalid-address-0");
+        require(
+            expiry == 0 || block.timestamp <= expiry,
+            "SportX/permit-expired"
+        );
+        require(nonce == nonces[holder]++, "SportX/invalid-nonce");
+
         bytes32 digest =
             keccak256(
                 abi.encodePacked(
@@ -63,10 +70,8 @@ contract SportX is ERC20 {
                 )
             );
 
-        require(holder != address(0), "SportX/invalid-address-0");
         require(holder == ecrecover(digest, v, r, s), "SportX/invalid-permit");
-        require(expiry == 0 || block.timestamp <= expiry, "SportX/permit-expired");
-        require(nonce == nonces[holder]++, "SportX/invalid-nonce");
+
         _approve(holder, spender, amount);
     }
 }

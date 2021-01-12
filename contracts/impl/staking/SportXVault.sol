@@ -8,9 +8,11 @@ import "../../interfaces/staking/IStaking.sol";
 import "../../interfaces/permissions/IPermissions.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract SportXVault is ISportXVault {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     IStaking private staking;
     IPermissions private permissions;
@@ -55,7 +57,7 @@ contract SportXVault is ISportXVault {
     function emergencyWithdraw() public override onlyDuringEmergencyHatch {
         uint256 callerBalance = balances[msg.sender];
         balances[msg.sender] = 0;
-        sportX.transfer(msg.sender, callerBalance);
+        sportX.safeTransfer(msg.sender, callerBalance);
     }
 
     function deposit(address staker, uint256 amount)
@@ -64,7 +66,7 @@ contract SportXVault is ISportXVault {
         onlyStaking
     {
         balances[staker] = balances[staker].add(amount);
-        sportX.transferFrom(staker, address(this), amount);
+        sportX.safeTransferFrom(staker, address(this), amount);
     }
 
     function withdraw(address staker, uint256 amount)
@@ -73,10 +75,10 @@ contract SportXVault is ISportXVault {
         onlyStaking
     {
         balances[staker] = balances[staker].sub(amount);
-        sportX.transfer(staker, amount);
+        sportX.safeTransfer(staker, amount);
     }
 
-    function openEmergencyHatch() public override onlyDefaultAdminRole {
+    function openEmergencyHatch() external override onlyDefaultAdminRole {
         emergencyHatch = true;
     }
 

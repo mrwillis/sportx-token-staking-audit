@@ -55,7 +55,7 @@ contract StakingParameters is IStakingParameters {
         onlySystemParametersRole
     {
         require(
-            newRewardMultiplier < FRACTION_PRECISION,
+            newRewardMultiplier <= FRACTION_PRECISION,
             "NEW_REWARD_MULTIPLIER_TOO_HIGH"
         );
         rewardMultipliers[token] = newRewardMultiplier;
@@ -85,7 +85,7 @@ contract StakingParameters is IStakingParameters {
         return epochLength;
     }
 
-    function getRewardMultipliers(address token)
+    function getRewardMultiplier(address token)
         public
         view
         override

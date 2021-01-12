@@ -49,7 +49,7 @@ contract SportXStakingRewardsPool is ISportXStakingRewardsPool {
         override
         onlyDefaultAdminRole
     {
-        sportX.transfer(msg.sender, amount);
+        sportX.safeTransfer(msg.sender, amount);
     }
 
     function stakeBehalf(address user, uint256 amount)

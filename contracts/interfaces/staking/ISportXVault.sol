@@ -10,7 +10,7 @@ abstract contract ISportXVault {
 
     function withdraw(address staker, uint256 amount) public virtual;
 
-    function openEmergencyHatch() public virtual;
+    function openEmergencyHatch() external virtual;
 
     function getEmergencyHatch() public view virtual returns (bool);
 
