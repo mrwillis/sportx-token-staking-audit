@@ -6,7 +6,7 @@ abstract contract ISportXVault {
     /// @notice Throws if not in emergency hatch mode
     function emergencyWithdraw() public virtual;
 
-    function deposit(address staker, uint256 amount) public virtual;
+    function deposit(address staker, address tokenSender, uint256 amount) public virtual;
 
     function withdraw(address staker, uint256 amount) public virtual;
 

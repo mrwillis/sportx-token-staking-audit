@@ -60,13 +60,13 @@ contract SportXVault is ISportXVault {
         sportX.safeTransfer(msg.sender, callerBalance);
     }
 
-    function deposit(address staker, uint256 amount)
+    function deposit(address staker, address tokenSender, uint256 amount)
         public
         override
         onlyStaking
     {
         balances[staker] = balances[staker].add(amount);
-        sportX.safeTransferFrom(staker, address(this), amount);
+        sportX.safeTransferFrom(tokenSender, address(this), amount);
     }
 
     function withdraw(address staker, uint256 amount)

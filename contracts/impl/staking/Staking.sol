@@ -463,7 +463,7 @@ contract Staking is IStaking, Initializable, ReentrancyGuard {
     ) private {
         stakedAmounts[staker] = stakedAmounts[staker].add(amount);
         totalStakedAmount = totalStakedAmount.add(amount);
-        sportXVault.deposit(tokenSender, amount);
+        sportXVault.deposit(staker, tokenSender, amount);
         emit Stake(staker, amount, tokenSender);
     }
 
